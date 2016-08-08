@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+
+'use strict';
+
+const spawn     = require(`child_process`).spawn;
+const util      = require(`util`);
+const StdStream = require(`../lib/StdStream`);
+const forever   = require(`forever-monitor`);
+const config    = require(`../lib/config`);
+
+config.processes.forEach(def => {
+  def.name = def.cwd.split(`/`).reverse()[0];
+  const proc = new forever.Monitor(def.file, {
+    max            : Number.POSITIVE_INFINITY,
+    silent         : true,
+    args           : def.arguments,
+    sourceDir      : def.cwd,
+    cwd            : def.cwd,
+    watch          : true,
+    watchDirectory : def.cwd,
+    minUpTime      : 2000,
+    spinSleepTime  : 200,
+  });
+  const stdout = new StdStream(`[${def.name}]`);
+  const stderr = new StdStream(`[${def.name}] [error]`);
+  proc.on(`stdout`, data => stdout.liner.write(data));
+  proc.on(`stderr`, data => stderr.liner.write(data));
+  def.process = proc;
+  proc.start();
+});
+
+process.on(`SIGINT`, () => {
+  console.log(``); // eslint-disable-line // Line break
+  util.log(`[mozzart] Shutting down all processes`);
+  config.processes.forEach(definition => {
+    definition.process.kill();
+    util.log(`[mozzart] Process [${definition.name}] killed`);
+  });
+  process.exit(0); // eslint-disable-line
+});

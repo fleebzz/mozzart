@@ -1,0 +1,29 @@
+{
+  "name": "mozzart",
+  "version": "0.0.1",
+  "description": "",
+  "main": "",
+  "bin": {
+    "mozzart" : "bin/mozzart"
+  },
+  "dependencies": {
+    "extend": "^3.0.0",
+    "forever-monitor": "^1.7.0"
+  },
+  "devDependencies": {
+    "eslint": "^3.2.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@gitlab.com/weview/mozzart.git"
+  },
+  "author": "Florian Bezagu <florian@bezagu.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://gitlab.com/weview/mozzart/issues"
+  },
+  "homepage": "https://gitlab.com/weview/mozzart#README"
+}
