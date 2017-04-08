@@ -8,7 +8,10 @@ const StdStream = require(`../lib/StdStream`);
 const forever   = require(`forever-monitor`);
 const config    = require(`../lib/config`);
 
-config.processes.forEach(def => {
+// default = false
+config.silent = config.silent === true;
+
+const runDef = def => {
   def.name = def.cwd.split(`/`).reverse()[0];
   const proc = new forever.Monitor(def.file, {
     max            : Number.POSITIVE_INFINITY,
@@ -21,13 +24,33 @@ config.processes.forEach(def => {
     minUpTime      : 2000,
     spinSleepTime  : 200,
   });
-  const stdout = new StdStream(`[${def.name}]`);
+  if (!config.silent) {
+    const stdout = new StdStream(`[${def.name}]`);
+    proc.on(`stdout`, data => stdout.liner.write(data));
+  }
   const stderr = new StdStream(`[${def.name}] [error]`);
-  proc.on(`stdout`, data => stdout.liner.write(data));
   proc.on(`stderr`, data => stderr.liner.write(data));
   def.process = proc;
   proc.start();
-});
+};
+
+let defIndex = 0;
+
+const runNextDef = () => {
+  const def = config.processes[defIndex];
+  if (!def) {
+    return util.log(`[mozzart] All processes are running`);
+  }
+  runDef(def);
+
+  return setTimeout(() => {
+    defIndex++;
+    runNextDef();
+  });
+};
+
+util.log(`[mozzart] Starting all processes`);
+runNextDef();
 
 process.on(`SIGINT`, () => {
   console.log(``); // eslint-disable-line // Line break

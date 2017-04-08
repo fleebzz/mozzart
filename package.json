@@ -1,14 +1,15 @@
 {
   "name": "mozzart",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "",
   "main": "",
   "bin": {
-    "mozzart" : "bin/mozzart"
+    "mozzart": "bin/mozzart"
   },
   "dependencies": {
     "extend": "^3.0.0",
-    "forever-monitor": "^1.7.0"
+    "forever-monitor": "^1.7.0",
+    "lodash": "^4.17.4"
   },
   "devDependencies": {
     "eslint": "^3.2.2"
@@ -18,12 +19,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@gitlab.com/weview/mozzart.git"
+    "url": "git+ssh://git@github.com:fleebzz/mozzart.git"
   },
   "author": "Florian Bezagu <florian@bezagu.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://gitlab.com/weview/mozzart/issues"
+    "url": "https://github.com/fleebzz/mozzart/issues"
   },
-  "homepage": "https://gitlab.com/weview/mozzart#README"
+  "homepage": "https://github.com/fleebzz/mozzart#README"
 }
