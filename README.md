@@ -5,16 +5,26 @@ Use it to run, watch and restart all your node apps with just one command.
 
 Very useful when developping on a **microservices** architecture.
 
+## Installation
+
 ```bash
 npm install -g mozzart
 ```
+Add `sudo` if you don't have rights on your system.
+
+## Run
+
+```bash
+mozzart
+```
+That's all. See [configuration](#configuration) for more informations.
 
 ## Configuration
 
 There are 3 ways to give a configuration to Mozzart. In this order, as soon as one exists, Mozzart takes it and stops looking :
 
   - With a command line configuration argument `--config=my-config.js`
-  - With a `.mozzart.js` file in the current directory
+  - With a `.mozzart.js` file in the directory you execute `mozzart`
   - With a `.mozzart.js` file in your home directory
 
 ### Options
