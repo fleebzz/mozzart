@@ -12,6 +12,7 @@ const config    = require(`../lib/config`);
 config.silent = config.silent === true;
 
 const runDef = def => {
+  def.cwd  = def.cwd.replace(/\/$/g, ``);
   def.name = def.cwd.split(`/`).reverse()[0];
   const proc = new forever.Monitor(def.file, {
     max            : Number.POSITIVE_INFINITY,
