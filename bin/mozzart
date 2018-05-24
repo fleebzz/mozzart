@@ -39,6 +39,7 @@ let defIndex = 0;
 
 const runNextDef = () => {
   const def = config.processes[defIndex];
+  const timeout = config.wait || 1;
   if (!def) {
     return util.log(`[mozzart] All processes are running`);
   }
@@ -47,7 +48,7 @@ const runNextDef = () => {
   return setTimeout(() => {
     defIndex++;
     runNextDef();
-  });
+  }, timeout);
 };
 
 util.log(`[mozzart] Starting all processes`);
