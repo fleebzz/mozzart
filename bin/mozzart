@@ -11,7 +11,7 @@ const config    = require(`../lib/config`);
 // default = false
 config.silent = config.silent === true;
 
-const runDef = def => {
+const runDef = def => new Promise(resolve => { // eslint-disable-line
   def.cwd  = def.cwd.replace(/\/$/g, ``);
   def.name = def.cwd.split(`/`).reverse()[0];
   const foreverOptions = {
@@ -20,6 +20,7 @@ const runDef = def => {
     args           : def.arguments,
     sourceDir      : def.cwd,
     cwd            : def.cwd,
+    fork           : true,
     minUpTime      : 2000,
     spinSleepTime  : 200,
   };
@@ -35,18 +36,25 @@ const runDef = def => {
   const stderr = new StdStream(`[${def.name}] [error]`);
   proc.on(`stderr`, data => stderr.liner.write(data));
   def.process = proc;
+
   proc.start();
-};
+
+  if (def.sync !== true) { return resolve(); }
+
+  proc.on(`message`, msg => {
+    if (msg === `PROCESS_READY`) { return resolve(); }
+  });
+});
 
 let defIndex = 0;
 
-const runNextDef = () => {
+const runNextDef = async () => {
   const def = config.processes[defIndex];
   const timeout = config.wait || 1;
   if (!def) {
     return util.log(`[mozzart] All processes are running`);
   }
-  runDef(def);
+  await runDef(def);
 
   return setTimeout(() => {
     defIndex++;
