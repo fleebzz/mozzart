@@ -14,6 +14,7 @@ config.silent = config.silent === true;
 const runDef = def => new Promise(resolve => { // eslint-disable-line
   def.cwd  = def.cwd.replace(/\/$/g, ``);
   def.name = def.cwd.split(`/`).reverse()[0];
+  def.watch = typeof def.watch === `boolean` ? def.watch : config.watch;
   const foreverOptions = {
     max            : Number.POSITIVE_INFINITY,
     silent         : true,
@@ -24,7 +25,7 @@ const runDef = def => new Promise(resolve => { // eslint-disable-line
     minUpTime      : 2000,
     spinSleepTime  : 200,
   };
-  if (config.watch) {
+  if (def.watch) {
     foreverOptions.watch          = true;
     foreverOptions.watchDirectory = def.cwd;
   }
