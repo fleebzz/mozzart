@@ -7,6 +7,7 @@ const util      = require(`util`);
 const StdStream = require(`../lib/StdStream`);
 const forever   = require(`forever-monitor`);
 const config    = require(`../lib/config`);
+const pack      = require(`../package.json`);
 
 // default = false
 config.silent = config.silent === true;
@@ -62,6 +63,11 @@ const runNextDef = async () => {
     runNextDef();
   }, timeout);
 };
+
+if (config.showVersion) {
+  console.log(`mozzart@${pack.version}`);
+  return process.exit(0);
+}
 
 util.log(`[mozzart] Starting all processes`);
 runNextDef();
