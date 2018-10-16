@@ -8,6 +8,7 @@ const StdStream = require(`../lib/StdStream`);
 const forever   = require(`forever-monitor`);
 const config    = require(`../lib/config`);
 const pack      = require(`../package.json`);
+const log       = require(`../lib/log`);
 
 // default = false
 config.silent = config.silent === true;
@@ -54,7 +55,7 @@ const runNextDef = async () => {
   const def = config.processes[defIndex];
   const timeout = config.wait || 1;
   if (!def) {
-    return util.log(`[mozzart] All processes are running`);
+    return log(`[mozzart] All processes are running`);
   }
   await runDef(def);
 
@@ -69,15 +70,15 @@ if (config.showVersion) {
   return process.exit(0);
 }
 
-util.log(`[mozzart] Starting all processes`);
+log(`[mozzart] Starting all processes`);
 runNextDef();
 
 process.on(`SIGINT`, () => {
   console.log(``); // eslint-disable-line // Line break
-  util.log(`[mozzart] Shutting down all processes`);
+  log(`[mozzart] Shutting down all processes`);
   config.processes.forEach(definition => {
     definition.process.kill();
-    util.log(`[mozzart] Process [${definition.name}] killed`);
+    log(`[mozzart] Process [${definition.name}] killed`);
   });
   process.exit(0); // eslint-disable-line
 });
