@@ -10,6 +10,8 @@ const config = require(`../lib/config`);
 const log = require(`../lib/log`);
 const registry = require(`../lib/registry`);
 
+const WATCH_CHANGE_TIMEOUT = 800;
+
 let defIndex = 0;
 
 const runDef = def => new Promise(async resolve => { // eslint-disable-line
@@ -28,11 +30,12 @@ const runDef = def => new Promise(async resolve => { // eslint-disable-line
     spinSleepTime : 200,
   };
   const proc = new forever.Monitor(def.file, foreverOptions);
+  const stdPrefix = `[${def.name}][${proc.uid}]`;
   if (!config.silent) {
-    const stdout = new StdStream(`[${def.name}]`);
+    const stdout = new StdStream(`${stdPrefix}`);
     proc.on(`stdout`, data => stdout.liner.write(data));
   }
-  const stderr = new StdStream(`[${def.name}] [error]`);
+  const stderr = new StdStream(`${stdPrefix} [error]`);
   proc.on(`stderr`, data => stderr.liner.write(data));
   def.process = proc;
 
@@ -76,9 +79,16 @@ const runDef = def => new Promise(async resolve => { // eslint-disable-line
     .on(`all`, async () => {
       const isAuto = await registry.isAuto(proc.uid);
 
-      if (!isAuto) { return; }
+      if (!isAuto || def.changeTimeout) { return; }
 
-      try { proc.stop(); } catch (e) {}
+      def.changeTimeout = setTimeout(() => {
+        log(`[mozzart] Process ${proc.uid} has changed, restarting...`);
+
+        try { proc.stop(); } catch (e) {}
+
+        Reflect.deleteProperty(def, `changeTimeout`);
+      }, WATCH_CHANGE_TIMEOUT);
+
     });
   }
 
