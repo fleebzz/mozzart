@@ -48,7 +48,7 @@ process.on(`SIGINT`, async () => {
   log(`[mozzart] Shutting down all processes`);
   await registry.clean();
   config.processes.forEach(definition => {
-    definition.process.kill();
+    definition.process.kill(`SIGKILL`);
     log(`[mozzart] Process [${definition.name}] killed`);
   });
   process.exit(0); // eslint-disable-line
