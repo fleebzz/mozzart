@@ -2,80 +2,51 @@
 
 'use strict';
 
-const spawn     = require(`child_process`).spawn;
-const util      = require(`util`);
-const StdStream = require(`../lib/StdStream`);
-const forever   = require(`forever-monitor`);
-const config    = require(`../lib/config`);
-const pack      = require(`../package.json`);
-const log       = require(`../lib/log`);
+const config = require(`../lib/config`);
+const pack = require(`../package.json`);
+const startAll = require(`./startAll`);
+const listProcesses = require(`./list`);
+const log = require(`../lib/log`);
+const registry = require(`../lib/registry`);
 
-// default = false
-config.silent = config.silent === true;
+const showVersion = () => {
+  console.log(`mozzart@${pack.version}`);
 
-const runDef = def => new Promise(resolve => { // eslint-disable-line
-  def.cwd  = def.cwd.replace(/\/$/g, ``);
-  def.name = def.cwd.split(`/`).reverse()[0];
-  def.watch = typeof def.watch === `boolean` ? def.watch : config.watch;
-  const foreverOptions = {
-    max            : Number.POSITIVE_INFINITY,
-    silent         : true,
-    args           : def.arguments,
-    sourceDir      : def.cwd,
-    cwd            : def.cwd,
-    fork           : true,
-    minUpTime      : 2000,
-    spinSleepTime  : 200,
-  };
-  if (def.watch) {
-    foreverOptions.watch          = true;
-    foreverOptions.watchDirectory = def.cwd;
-  }
-  const proc = new forever.Monitor(def.file, foreverOptions);
-  if (!config.silent) {
-    const stdout = new StdStream(`[${def.name}]`);
-    proc.on(`stdout`, data => stdout.liner.write(data));
-  }
-  const stderr = new StdStream(`[${def.name}] [error]`);
-  proc.on(`stderr`, data => stderr.liner.write(data));
-  def.process = proc;
-
-  proc.start();
-
-  if (def.sync !== true) { return resolve(); }
-
-  proc.on(`message`, msg => {
-    if (msg === `PROCESS_READY`) { return resolve(); }
-  });
-});
-
-let defIndex = 0;
-
-const runNextDef = async () => {
-  const def = config.processes[defIndex];
-  const timeout = config.wait || 1;
-  if (!def) {
-    return log(`[mozzart] All processes are running`);
-  }
-  await runDef(def);
-
-  return setTimeout(() => {
-    defIndex++;
-    runNextDef();
-  }, timeout);
+  process.exit(0);
 };
 
-if (config.showVersion) {
-  console.log(`mozzart@${pack.version}`);
-  return process.exit(0);
+const start = async uid => {
+  log(`Starting ${uid}`);
+  await registry.setAuto(uid, false);
+  await registry.addResumeUid(uid);
+  const mozzReg = await registry.get(`mozzart`);
+  process.kill(mozzReg.pid, `SIGCONT`);
+};
+
+const stop = async uid => {
+  log(`Stopping ${uid}`);
+  await registry.setAuto(uid, false);
+  const pid = await registry.getPid(uid);
+
+  process.kill(pid);
+};
+
+if (config.command === `showVersion`) {
+  showVersion();
+} else if (config.command === `startAll`) {
+  startAll();
+} else if (config.command === `start`) {
+  start(config.uidForCmd);
+} else if (config.command === `stop`) {
+  stop(config.uidForCmd);
+} else if (config.command === `listProcesses`) {
+  listProcesses();
 }
 
-log(`[mozzart] Starting all processes`);
-runNextDef();
-
-process.on(`SIGINT`, () => {
+process.on(`SIGINT`, async () => {
   console.log(``); // eslint-disable-line // Line break
   log(`[mozzart] Shutting down all processes`);
+  await registry.clean();
   config.processes.forEach(definition => {
     definition.process.kill();
     log(`[mozzart] Process [${definition.name}] killed`);
