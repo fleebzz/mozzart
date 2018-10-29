@@ -2,6 +2,7 @@
 
 'use strict';
 
+const _ = require(`lodash`);
 const config = require(`../lib/config`);
 const pack = require(`../package.json`);
 const startAll = require(`./startAll`);
@@ -46,10 +47,19 @@ if (config.command === `showVersion`) {
 process.on(`SIGINT`, async () => {
   console.log(``); // eslint-disable-line // Line break
   log(`[mozzart] Shutting down all processes`);
+  await Promise.all(
+    _.map(registry.locals.runningDefs, definition => {
+      definition.isKilling = true;
+      definition.process.kill(`SIGKILL`);
+
+      return new Promise(resolve =>
+        setTimeout(() => {
+          log(`[mozzart] Process [${definition.name}] killed`);
+          resolve();
+        }, 200)
+      );
+    })
+  );
   await registry.clean();
-  config.processes.forEach(definition => {
-    definition.process.kill(`SIGKILL`);
-    log(`[mozzart] Process [${definition.name}] killed`);
-  });
   process.exit(0); // eslint-disable-line
 });

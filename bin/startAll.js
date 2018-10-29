@@ -16,6 +16,7 @@ const runDef = def => new Promise(async resolve => { // eslint-disable-line
   def.cwd  = def.cwd.replace(/\/$/g, ``);
   def.name = def.cwd.split(`/`).reverse()[0];
   def.watch = typeof def.watch === `boolean` ? def.watch : config.watch;
+  def.isKilling = false;
   const foreverOptions = {
     max           : 1,
     silent        : true,
@@ -42,6 +43,8 @@ const runDef = def => new Promise(async resolve => { // eslint-disable-line
   });
 
   proc.on(`exit:code`, async () => {
+    if (def.isKilling) { return; }
+
     const isAuto = await registry.isAuto(proc.uid);
     const newPid = def.isRestarting ? proc.child.pid : null;
 
