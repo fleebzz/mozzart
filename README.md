@@ -12,18 +12,29 @@ npm install -g mozzart
 ```
 Add `sudo` if you don't have rights on your system.
 
-## Run
+## Command Line Usage
 
-```bash
-mozzart
 ```
-That's all. See [configuration](#configuration) for more informations.
+$ mozzart [action]
+
+actions:
+  start         Start all processes found in config file. Default action when non one given
+  list          List all processes, running or not with their <uid> and <pid>
+  resume <uid>  Resume the process referenced by <uid> when it has been manually stopped
+  stop <uid>    Stop the process referenced by <uid>
+  version       Show current Mozzart version
+
+options:
+  -c, --config  The path where config file is located. Absolute or relative from current working dir
+```
+
+See [configuration](#configuration) for more informations.
 
 ## Configuration
 
 There are 3 ways to give a configuration to Mozzart. In this order, as soon as one exists, Mozzart takes it and stops looking :
 
-  - With a command line configuration argument `--config=my-config.js`
+  - With a command line configuration argument `--config my-config.js`
   - With a `.mozzart.js` file in the directory you execute `mozzart`
   - With a `.mozzart.js` file in your home directory
 
