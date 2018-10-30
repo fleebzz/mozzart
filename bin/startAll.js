@@ -79,12 +79,12 @@ const runDef = def => new Promise(async resolve => { // eslint-disable-line
     .on(`all`, async () => {
       const isAuto = await registry.isAuto(proc.uid);
 
-      if (!isAuto || def.changeTimeout) { return; }
+      if (!isAuto || def.changeTimeout || !proc.running) { return; }
 
       def.changeTimeout = setTimeout(() => {
         log(`[mozzart] Process ${proc.uid} has changed, restarting...`);
 
-        try { proc.stop(); } catch (e) {}
+        try { proc.kill(`SIGKILL`); } catch (e) {}
 
         Reflect.deleteProperty(def, `changeTimeout`);
       }, WATCH_CHANGE_TIMEOUT);
