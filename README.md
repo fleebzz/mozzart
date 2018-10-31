@@ -23,6 +23,8 @@ actions:
   resume <uid>    Resume the process referenced by <uid> when it has been manually stopped
   stop <uid>      Stop the process referenced by <uid>
   restart <uid>   Stop (if running) and resume <uid>
+  remove <uid>    Stop <uid> and remove it from list. Keep it in config file
+  update          Reread config file and stop or start diff
   version         Show current Mozzart version
 
 options:
