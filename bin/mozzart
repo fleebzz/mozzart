@@ -35,7 +35,17 @@ const stop = async uid => {
 
   if (!pid) { return log(`Not running`); }
 
-  process.kill(pid);
+  process.kill(pid, `SIGKILL`);
+};
+
+const restart = async uid => {
+  await stop(uid);
+  const isAuto = await registry.isAuto(uid);
+
+  if (!isAuto) {
+    setTimeout(() => resume(uid), 500);
+  }
+
 };
 
 if (config.command === `showVersion`) {
@@ -44,6 +54,8 @@ if (config.command === `showVersion`) {
   startAll();
 } else if (config.command === `resume`) {
   resume(config.uidForCmd);
+} else if (config.command === `restart`) {
+  restart(config.uidForCmd);
 } else if (config.command === `stop`) {
   stop(config.uidForCmd);
 } else if (config.command === `listProcesses`) {

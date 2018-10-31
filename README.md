@@ -18,11 +18,12 @@ Add `sudo` if you don't have rights on your system.
 $ mozzart [action]
 
 actions:
-  start         Start all processes found in config file. Default action when non one given
-  list          List all processes, running or not with their <uid> and <pid>
-  resume <uid>  Resume the process referenced by <uid> when it has been manually stopped
-  stop <uid>    Stop the process referenced by <uid>
-  version       Show current Mozzart version
+  start           Start all processes found in config file. Default action when non one given
+  list            List all processes, running or not with their <uid> and <pid>
+  resume <uid>    Resume the process referenced by <uid> when it has been manually stopped
+  stop <uid>      Stop the process referenced by <uid>
+  restart <uid>   Stop (if running) and resume <uid>
+  version         Show current Mozzart version
 
 options:
   -c, --config  The path where config file is located. Absolute or relative from current working dir
