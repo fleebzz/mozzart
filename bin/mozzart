@@ -17,7 +17,7 @@ const showVersion = () => {
 };
 
 const resume = async uid => {
-  log(`Starting ${uid}`);
+  log(`Starting ${uid}...`);
   const pid = await registry.getPid(uid);
 
   if (pid) { return log(`Already running`); }
@@ -25,17 +25,22 @@ const resume = async uid => {
   await registry.setAuto(uid, false);
   await registry.addResumeUid(uid);
   const mozzReg = await registry.get(`mozzart`);
-  process.kill(mozzReg.pid, `SIGCONT`);
+
+  return process.kill(mozzReg.pid, `SIGCONT`);
 };
 
 const stop = async uid => {
-  log(`Stopping ${uid}`);
+  log(`Stopping ${uid}...`);
   await registry.setAuto(uid, false);
   const pid = await registry.getPid(uid);
 
   if (!pid) { return log(`Not running`); }
 
-  process.kill(pid, `SIGKILL`);
+  try {
+    process.kill(pid, `SIGKILL`);
+  } catch (e) {}
+
+  return Promise.resolve();
 };
 
 const restart = async uid => {
@@ -45,7 +50,19 @@ const restart = async uid => {
   if (!isAuto) {
     setTimeout(() => resume(uid), 500);
   }
+};
 
+const remove = async uid => {
+  await stop(uid);
+  log(`Removing ${uid}...`);
+  await registry.addRemoveUid(uid);
+  const mozzReg = await registry.get(`mozzart`);
+
+  return process.kill(mozzReg.pid, `SIGCONT`);
+};
+
+const update = async () => {
+  console.log(config.processes);
 };
 
 if (config.command === `showVersion`) {
@@ -58,6 +75,10 @@ if (config.command === `showVersion`) {
   restart(config.uidForCmd);
 } else if (config.command === `stop`) {
   stop(config.uidForCmd);
+} else if (config.command === `remove`) {
+  remove(config.uidForCmd);
+} else if (config.command === `update`) {
+  update();
 } else if (config.command === `listProcesses`) {
   listProcesses();
 }
@@ -65,10 +86,12 @@ if (config.command === `showVersion`) {
 process.on(`SIGINT`, async () => {
   console.log(``); // eslint-disable-line // Line break
   log(`[mozzart] Shutting down all processes`);
+  const processes = await registry.getProcesses();
   await Promise.all(
-    _.map(registry.locals.runningDefs, definition => {
+    processes.map(async process => {
+      const definition = registry.locals.runningDefs[process.uid];
       definition.isKilling = true;
-      definition.process.kill(`SIGKILL`);
+      await stop(process.uid);
 
       return new Promise(resolve =>
         setTimeout(() => {

@@ -46,7 +46,8 @@ const runDef = def => new Promise(async resolve => { // eslint-disable-line
   });
 
   proc.on(`exit:code`, async () => {
-    if (def.isKilling) { return; }
+    const runningDef = registry.locals.runningDefs[def.process.uid];
+    if (def.isKilling || !runningDef) { return; }
 
     const isAuto = await registry.isAuto(proc.uid);
     const newPid = def.isRestarting ? proc.child.pid : null;
@@ -124,11 +125,24 @@ const resumeUids = async () => {
   }));
 };
 
+const removeUids = async () => {
+  const uids = await registry.popUidsToRemove();
+
+  return Promise.all(uids.map(async uid => {
+    Reflect.deleteProperty(registry.locals.runningDefs, uid);
+
+    return registry.removeUid(uid);
+  }));
+};
+
 module.exports = async () => {
   log(`[mozzart] Cleaning registry`);
   await registry.clean(process.pid);
   registry.locals.runningDefs = {};
-  process.on(`SIGCONT`, () => resumeUids());
+  process.on(`SIGCONT`, () => {
+    removeUids();
+    resumeUids();
+  });
   log(`[mozzart] Starting all processes`);
   runNextDef();
 };
