@@ -6,6 +6,7 @@ const _ = require(`lodash`);
 const config = require(`../lib/config`);
 const pack = require(`../package.json`);
 const startAll = require(`./startAll`);
+const start = require(`./start`);
 const listProcesses = require(`./list`);
 const log = require(`../lib/log`);
 const registry = require(`../lib/registry`);
@@ -52,17 +53,39 @@ const restart = async uid => {
   }
 };
 
-const remove = async uid => {
+const remove = async (uid, silent = false) => {
   await stop(uid);
   log(`Removing ${uid}...`);
   await registry.addRemoveUid(uid);
   const mozzReg = await registry.get(`mozzart`);
 
+  if (silent) { return Promise.resolve(); }
+
   return process.kill(mozzReg.pid, `SIGCONT`);
 };
 
+const addIdentifierToProc = proc => ({
+  ...proc,
+  $identifier : `${proc.cwd}/${proc.file}`,
+});
+
 const update = async () => {
-  console.log(config.processes);
+  const mozzReg = await registry.get(`mozzart`);
+  const currentProcesses = (await registry.getProcesses()).map(addIdentifierToProc);
+  const configProcesses = config.processes.map(addIdentifierToProc);
+
+  const processesToRemove = _.filter(currentProcesses, currentProcess =>
+    !_.find(configProcesses, proc => proc.$identifier === currentProcess.$identifier)
+  );
+
+  const definitionsToAdd = _.filter(configProcesses, proc =>
+    !_.find(currentProcesses, currentProcess => proc.$identifier === currentProcess.$identifier)
+  );
+
+  for (const proc of processesToRemove) { await remove(proc.uid); }
+  for (const def of definitionsToAdd) { await registry.addStartDef(def, true); }
+
+  return process.kill(mozzReg.pid, `SIGCONT`);
 };
 
 if (config.command === `showVersion`) {
@@ -83,22 +106,19 @@ if (config.command === `showVersion`) {
   listProcesses();
 }
 
+let isShuttingDown = false;
+
 process.on(`SIGINT`, async () => {
+  if (isShuttingDown) { return process.exit(1); }
+  isShuttingDown = true;
   console.log(``); // eslint-disable-line // Line break
   log(`[mozzart] Shutting down all processes`);
   const processes = await registry.getProcesses();
   await Promise.all(
     processes.map(async process => {
-      const definition = registry.locals.runningDefs[process.uid];
-      definition.isKilling = true;
-      await stop(process.uid);
+      registry.locals.runningDefs[process.uid].isKilling = true;
 
-      return new Promise(resolve =>
-        setTimeout(() => {
-          log(`[mozzart] Process [${definition.name}] killed`);
-          resolve();
-        }, 200)
-      );
+      return stop(process.uid);
     })
   );
   await registry.clean();
