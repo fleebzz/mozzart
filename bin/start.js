@@ -2,6 +2,7 @@
 
 const forever = require(`forever-monitor`);
 const chokidar = require(`chokidar`);
+const minimatch = require(`minimatch`);
 const path = require(`path`);
 const fs = require(`fs-extra`);
 const _ = require(`lodash`);
@@ -68,26 +69,28 @@ const start = def => new Promise(async resolve => { // eslint-disable-line
         !ignoreLine.match(/^[\s]*#/) && !ignoreLine.match(/^[\s]*$/)
       );
     } catch (e) {}
-    const ignored = ignoredPatterns.map(
-      ignoredItem => `${def.cwd}/${ignoredItem}`
-    );
-    chokidar.watch(def.cwd, {
-      ignoreInitial : true,
-      ignored,
-    })
-    .on(`all`, async () => {
+    chokidar.watch(def.cwd, { ignoreInitial : true })
+    .on(`all`, async (e, path) => {
       const isAuto = await registry.isAuto(proc.uid);
 
       if (!isAuto || def.changeTimeout || !proc.running) { return; }
 
       def.changeTimeout = setTimeout(() => {
-        log(`[mozzart] Process ${proc.uid} has changed, restarting...`);
+        let matchIgnored = false;
 
-        try { proc.kill(`SIGKILL`); } catch (e) {}
+        ignoredPatterns.forEach(pattern => {
+          if (matchIgnored) { return; }
+          matchIgnored = minimatch(path, pattern, { dot : true });
+        });
+
+        if (!matchIgnored) {
+          log(`[mozzart] Process ${proc.uid} has changed, restarting...`);
+
+          try { proc.kill(`SIGKILL`); } catch (e) {}
+        }
 
         Reflect.deleteProperty(def, `changeTimeout`);
       }, WATCH_CHANGE_TIMEOUT);
-
     });
   }
 
