@@ -1,6 +1,7 @@
 'use strict';
 
 const start = require(`./start`);
+const stop = require(`./stop`);
 const config = require(`../lib/config`);
 const log = require(`../lib/log`);
 const registry = require(`../lib/registry`);
@@ -34,7 +35,7 @@ const resumeUids = async () => {
     const def = registry.locals.runningDefs[uid];
     await registry.setAuto(uid);
 
-    return def.process.start();
+    return start(def);
   }));
 };
 
@@ -53,10 +54,24 @@ module.exports = async () => {
   await registry.clean(process.pid);
   registry.locals.runningDefs = {};
   process.on(`SIGCONT`, () => {
-    startDefs(),
+    startDefs();
     removeUids();
     resumeUids();
   });
   log(`[mozzart] Starting all processes`);
   runNextDef();
+
+  registry.locals.isShuttingDown = false;
+
+  process.on(`SIGINT`, async () => {
+    if (registry.locals.isShuttingDown) { return; }
+    registry.locals.isShuttingDown = true;
+    console.log(``); // eslint-disable-line // Line break
+    log(`[mozzart] Shutting down all processes`);
+    const processes = await registry.getProcesses();
+    await Promise.all(
+      processes.map(async process => stop(process.uid))
+    );
+    process.exit(0); // eslint-disable-line
+  });
 };

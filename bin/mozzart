@@ -2,11 +2,14 @@
 
 'use strict';
 
+const { spawn } = require(`child_process`);
 const _ = require(`lodash`);
+const fs = require(`fs-extra`);
+const stop = require(`./stop`);
+const resume = require(`./resume`);
 const config = require(`../lib/config`);
 const pack = require(`../package.json`);
 const startAll = require(`./startAll`);
-const start = require(`./start`);
 const listProcesses = require(`./list`);
 const log = require(`../lib/log`);
 const registry = require(`../lib/registry`);
@@ -15,33 +18,6 @@ const showVersion = () => {
   console.log(`mozzart@${pack.version}`);
 
   process.exit(0);
-};
-
-const resume = async uid => {
-  log(`Starting ${uid}...`);
-  const pid = await registry.getPid(uid);
-
-  if (pid) { return log(`Already running`); }
-
-  await registry.setAuto(uid, false);
-  await registry.addResumeUid(uid);
-  const mozzReg = await registry.get(`mozzart`);
-
-  return process.kill(mozzReg.pid, `SIGCONT`);
-};
-
-const stop = async uid => {
-  log(`Stopping ${uid}...`);
-  await registry.setAuto(uid, false);
-  const pid = await registry.getPid(uid);
-
-  if (!pid) { return log(`Not running`); }
-
-  try {
-    process.kill(pid, `SIGKILL`);
-  } catch (e) {}
-
-  return Promise.resolve();
 };
 
 const restart = async uid => {
@@ -88,6 +64,15 @@ const update = async () => {
   return process.kill(mozzReg.pid, `SIGCONT`);
 };
 
+const logProcess = async uid => {
+  const logPath = registry.path(uid, false);
+  const exists = await fs.exists(logPath);
+
+  if (!exists) { return log(`No log file found for ${uid}`); }
+
+  spawn(`tail`, [`-f`, logPath], { stdio : `inherit` });
+};
+
 if (config.command === `showVersion`) {
   showVersion();
 } else if (config.command === `start`) {
@@ -102,25 +87,8 @@ if (config.command === `showVersion`) {
   remove(config.uidForCmd);
 } else if (config.command === `update`) {
   update();
+} else if (config.command === `logProcess`) {
+  logProcess(config.uidForCmd);
 } else if (config.command === `listProcesses`) {
   listProcesses();
 }
-
-let isShuttingDown = false;
-
-process.on(`SIGINT`, async () => {
-  if (isShuttingDown) { return process.exit(1); }
-  isShuttingDown = true;
-  console.log(``); // eslint-disable-line // Line break
-  log(`[mozzart] Shutting down all processes`);
-  const processes = await registry.getProcesses();
-  await Promise.all(
-    processes.map(async process => {
-      registry.locals.runningDefs[process.uid].isKilling = true;
-
-      return stop(process.uid);
-    })
-  );
-  await registry.clean();
-  process.exit(0); // eslint-disable-line
-});

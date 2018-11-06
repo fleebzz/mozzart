@@ -1,64 +1,66 @@
 'use strict';
 
-const forever = require(`forever-monitor`);
+const { spawn } = require(`child_process`);
 const chokidar = require(`chokidar`);
 const minimatch = require(`minimatch`);
 const path = require(`path`);
 const fs = require(`fs-extra`);
 const _ = require(`lodash`);
-const StdStream = require(`../lib/StdStream`);
+const stop = require(`./stop`);
+const resume = require(`./resume`);
 const config = require(`../lib/config`);
+const StdStream = require(`../lib/StdStream`);
 const log = require(`../lib/log`);
 const registry = require(`../lib/registry`);
 
 const WATCH_CHANGE_TIMEOUT = 800;
+const uidPossibilities = `abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789`;
+const uidLength = 4;
+
+const generateUid = () => _.times(uidLength, () => uidPossibilities[_.random(uidPossibilities.length - 1)]).join(``);
 
 const start = def => new Promise(async resolve => { // eslint-disable-line
   def.cwd  = def.cwd.replace(/\/$/g, ``);
   def.name = def.cwd.split(`/`).reverse()[0];
+  def.uid = def.uid || generateUid();
   def.watch = typeof def.watch === `boolean` ? def.watch : config.watch;
   def.isKilling = false;
-  const foreverOptions = {
-    max           : 1,
-    silent        : true,
-    args          : def.arguments,
-    sourceDir     : def.cwd,
-    cwd           : def.cwd,
-    fork          : true,
-    minUpTime     : 2000,
-    spinSleepTime : 200,
+  const spawnOptions = {
+    cwd : def.cwd,
+    silent : true,
   };
-  const proc = new forever.Monitor(def.file, foreverOptions);
-  const stdPrefix = `[${def.name}][${proc.uid}]`;
+  log(`Starting ${def.uid}...`)
+  const proc = spawn(`node`, [def.file, ...def.arguments], spawnOptions);
+  const stdPrefix = `[${def.name}][${def.uid}]`;
+  const logPath = registry.path(def.uid, false);
+  const logStream = fs.createWriteStream(logPath, { flags : `a` });
   if (!config.silent) {
-    const stdout = new StdStream(`${stdPrefix}`);
-    proc.on(`stdout`, data => stdout.liner.write(data));
+    const stdout = new StdStream(stdPrefix, logStream);
+    proc.stdout.on(`data`, data => stdout.liner.write(data));
   }
-  const stderr = new StdStream(`${stdPrefix} [error]`);
-  proc.on(`stderr`, data => stderr.liner.write(data));
+  const stderr = new StdStream(`${stdPrefix} [error]`, logStream);
+  proc.stderr.on(`data`, data => stderr.liner.write(data));
+
   def.process = proc;
 
-  proc.on(`start`, async () => {
-    await registry.registerProcess(proc, def);
-    await registry.savePid(proc.uid, proc.child.pid);
-    registry.locals.runningDefs[proc.uid] = def;
-  });
+  await registry.registerProcess(proc, def);
+  await registry.savePid(def.uid, proc.pid);
+  registry.locals.runningDefs[def.uid] = def;
 
-  proc.on(`exit:code`, async () => {
-    const runningDef = registry.locals.runningDefs[def.process.uid];
-    if (def.isKilling || !runningDef) { return; }
+  proc.on(`close`, async () => {
+    const runningDef = registry.locals.runningDefs[def.uid];
+    if (def.isKilling || !runningDef || registry.locals.isShuttingDown) { return; }
 
-    const isAuto = await registry.isAuto(proc.uid);
-    const newPid = def.isRestarting ? proc.child.pid : null;
+    const isAuto = await registry.isAuto(def.uid);
+    const newPid = def.isRestarting ? proc.pid : null;
 
-    await registry.savePid(proc.uid, newPid);
+    await registry.savePid(def.uid, newPid);
 
     if (isAuto) {
-      proc.start();
+      log(`[mozzart] Process ${def.uid} was killed, restarting...`);
+      start(def);
     }
   });
-
-  proc.start();
 
   if (def.watch) {
     const ignoreFilePath = path.resolve(def.cwd, `.foreverignore`);
@@ -71,11 +73,11 @@ const start = def => new Promise(async resolve => { // eslint-disable-line
     } catch (e) {}
     chokidar.watch(def.cwd, { ignoreInitial : true })
     .on(`all`, async (e, path) => {
-      const isAuto = await registry.isAuto(proc.uid);
+      const isAuto = await registry.isAuto(def.uid);
 
-      if (!isAuto || def.changeTimeout || !proc.running) { return; }
+      if (!isAuto || def.changeTimeout) { return; }
 
-      def.changeTimeout = setTimeout(() => {
+      def.changeTimeout = setTimeout(async () => {
         let matchIgnored = false;
 
         ignoredPatterns.forEach(pattern => {
@@ -84,9 +86,10 @@ const start = def => new Promise(async resolve => { // eslint-disable-line
         });
 
         if (!matchIgnored) {
-          log(`[mozzart] Process ${proc.uid} has changed, restarting...`);
+          log(`[mozzart] Process ${def.uid} has changed, restarting...`);
 
-          try { proc.kill(`SIGKILL`); } catch (e) {}
+          await stop(def.uid);
+          await resume(def.uid);
         }
 
         Reflect.deleteProperty(def, `changeTimeout`);
