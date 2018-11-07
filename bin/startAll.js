@@ -6,22 +6,6 @@ const config = require(`../lib/config`);
 const log = require(`../lib/log`);
 const registry = require(`../lib/registry`);
 
-let defIndex = 0;
-
-const runNextDef = async () => {
-  const def = config.processes[defIndex];
-  const timeout = config.wait || 1;
-  if (!def) {
-    return log(`[mozzart] All processes are running`);
-  }
-  await start(def);
-
-  return setTimeout(() => {
-    defIndex++;
-    runNextDef();
-  }, timeout);
-};
-
 const startDefs = async () => {
   const defs = await registry.popDefsToStart();
 
@@ -59,7 +43,11 @@ module.exports = async () => {
     resumeUids();
   });
   log(`[mozzart] Starting all processes`);
-  runNextDef();
+  await Promise.all(config.processes.map(proc =>
+    registry.addStartDef(proc)
+  ));
+  await startDefs();
+  log(`[mozzart] All processes are running`);
 
   registry.locals.isShuttingDown = false;
 

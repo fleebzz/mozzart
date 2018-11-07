@@ -8,6 +8,7 @@ const fs = require(`fs-extra`);
 const stop = require(`./stop`);
 const resume = require(`./resume`);
 const config = require(`../lib/config`);
+const env = require(`../lib/env`);
 const pack = require(`../package.json`);
 const startAll = require(`./startAll`);
 const listProcesses = require(`./list`);
@@ -33,11 +34,11 @@ const remove = async (uid, silent = false) => {
   await stop(uid);
   log(`Removing ${uid}...`);
   await registry.addRemoveUid(uid);
-  const mozzReg = await registry.get(`mozzart`);
+  const mozzartPid = await registry.getMozzartPid();
 
   if (silent) { return Promise.resolve(); }
 
-  return process.kill(mozzReg.pid, `SIGCONT`);
+  return process.kill(mozzartPid, `SIGCONT`);
 };
 
 const addIdentifierToProc = proc => ({
@@ -46,7 +47,6 @@ const addIdentifierToProc = proc => ({
 });
 
 const update = async () => {
-  const mozzReg = await registry.get(`mozzart`);
   const currentProcesses = (await registry.getProcesses()).map(addIdentifierToProc);
   const configProcesses = config.processes.map(addIdentifierToProc);
 
@@ -59,13 +59,15 @@ const update = async () => {
   );
 
   for (const proc of processesToRemove) { await remove(proc.uid); }
-  for (const def of definitionsToAdd) { await registry.addStartDef(def, true); }
+  for (const def of definitionsToAdd) { await registry.addStartDef(def); }
 
-  return process.kill(mozzReg.pid, `SIGCONT`);
+  const mozzartPid = await registry.getMozzartPid();
+
+  return process.kill(mozzartPid, `SIGCONT`);
 };
 
 const logProcess = async uid => {
-  const logPath = registry.path(uid, false);
+  const logPath = env.logPath(uid);
   const exists = await fs.exists(logPath);
 
   if (!exists) { return log(`No log file found for ${uid}`); }
