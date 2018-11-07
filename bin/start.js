@@ -1,7 +1,7 @@
 'use strict';
 
 const { spawn } = require(`child_process`);
-const chokidar = require(`chokidar`);
+const watch = require(`node-watch`);
 const minimatch = require(`minimatch`);
 const path = require(`path`);
 const fs = require(`fs-extra`);
@@ -20,7 +20,6 @@ const start = def => new Promise(async resolve => { // eslint-disable-line
   const spawnOptions = {
     cwd : def.cwd,
     silent : true,
-    detached : true,
   };
   log(`Starting ${def.uid}...`)
   const proc = spawn(`node`, [def.file, ...def.arguments], spawnOptions);
@@ -65,32 +64,35 @@ const start = def => new Promise(async resolve => { // eslint-disable-line
         !ignoreLine.match(/^[\s]*#/) && !ignoreLine.match(/^[\s]*$/)
       );
     } catch (e) {}
-    chokidar.watch(def.cwd, { ignoreInitial : true })
-    .on(`all`, async (e, path) => {
+    const watchOpts = {
+      recursive : true,
+      filter (file) {
+        let matchIgnored = false;
+
+        ignoredPatterns.forEach(pattern => {
+          if (matchIgnored) { return; }
+          matchIgnored = minimatch(file, pattern, { dot : true });
+        });
+
+        return !matchIgnored;
+      },
+    };
+    watch(def.cwd, watchOpts, async () => {
       const isAuto = await registry.isAuto(def.uid);
 
       if (!isAuto || def.changeTimeout || def.isRestarting) { return; }
 
       def.isRestarting = true;
       await registry.setAuto(def.uid, false);
-      let matchIgnored = false;
+      def.changeTimeout = setTimeout(async () => {
+        log(`[mozzart] Process ${def.uid} has changed, restarting...`);
+        await stop(def.uid);
+        await start(def);
+        await registry.setAuto(def.uid);
+        def.isRestarting = false;
 
-      ignoredPatterns.forEach(pattern => {
-        if (matchIgnored) { return; }
-        matchIgnored = minimatch(path, pattern, { dot : true });
-      });
-
-      if (!matchIgnored) {
-        def.changeTimeout = setTimeout(async () => {
-          log(`[mozzart] Process ${def.uid} has changed, restarting...`);
-          await stop(def.uid);
-          await start(def);
-          await registry.setAuto(def.uid);
-          def.isRestarting = false;
-
-          Reflect.deleteProperty(def, `changeTimeout`);
-        }, WATCH_CHANGE_TIMEOUT);
-      }
+        Reflect.deleteProperty(def, `changeTimeout`);
+      }, WATCH_CHANGE_TIMEOUT);
     });
   }
 
