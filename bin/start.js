@@ -21,7 +21,12 @@ const start = def => new Promise(async resolve => { // eslint-disable-line
     cwd : def.cwd,
     silent : true,
   };
-  log(`Starting ${def.uid}...`)
+  const fullPath = path.join(def.cwd, def.file);
+  log(`Starting ${def.uid} - ${fullPath}...`);
+  const fileExists = await fs.pathExists(fullPath);
+  if (!fileExists) {
+    return log(`[ERROR] Path ${fullPath} does not exist`);
+  }
   const proc = spawn(`node`, [def.file, ...def.arguments], spawnOptions);
   const logPath = env.logPath(def.uid);
   const logStream = fs.createWriteStream(logPath, { flags : `a` });
